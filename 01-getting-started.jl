@@ -329,7 +329,7 @@ We see that the ground truth mass (`mass_ground_truth` = $(mass_ground_truth)) i
 
 # ╔═╡ 4ff23717-22fb-4b1b-998b-46b5c18996cf
 md"""
-# Spatially Weighted Calcium Scoring
+# 3. Spatially Weighted Calcium Scoring
 Spatially weighted calcium scoring is another approach that attempts to improve the traditional Agatston approach. One way of doing this is by avoiding thresholding in favor of weighting each voxel. 
 
 Below we will see how this technique can be used in CalciumScoring.jl
