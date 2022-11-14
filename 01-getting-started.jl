@@ -87,7 +87,7 @@ md"""
 ## Visualize
 Below, we can visualize the simulated coronary artery calcification phantom, along with the generated masks (overlayed in red)
 
-Let's first dilate the mask to make sure we include all potential calcium
+Let's first enlarge the calcium insert mask to make sure we include all potential calcium
 """
 
 # ╔═╡ f4b2bd5f-dc8d-45ff-9629-a712c489ee60
