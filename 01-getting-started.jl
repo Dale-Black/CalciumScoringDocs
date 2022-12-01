@@ -465,7 +465,7 @@ We see that the ground truth mass = $(ground_truth_calcium_mass) mg is close to 
 
 # ╔═╡ badbb0fb-6034-4111-87c6-a0188b73ea14
 md"""
-# Results (Mass)
+# Results Summary
 """
 
 # ╔═╡ 8df54213-6240-45d5-baaf-36a81094f998
@@ -477,11 +477,6 @@ df_results_masses = DataFrame(
 	ground_truth_calcium_mass = repeat([ground_truth_calcium_mass], 3),
 	calculated_calcium_mass = calculated_masses
 )
-
-# ╔═╡ 2fb084b8-f8d4-4e5e-893c-445cb7df485a
-md"""
-# Results (Score)
-"""
 
 # ╔═╡ 757901be-3d2f-4bea-9054-469cf7a18998
 calculated_scores = [agat_score, swcs]
@@ -571,6 +566,5 @@ df_results = DataFrame(
 # ╟─badbb0fb-6034-4111-87c6-a0188b73ea14
 # ╠═8df54213-6240-45d5-baaf-36a81094f998
 # ╠═879aafa3-a9b3-4a8e-bd54-6068be270332
-# ╟─2fb084b8-f8d4-4e5e-893c-445cb7df485a
 # ╠═757901be-3d2f-4bea-9054-469cf7a18998
 # ╠═f46b4cd0-cfc1-48fd-b964-b8cc282f8f53
