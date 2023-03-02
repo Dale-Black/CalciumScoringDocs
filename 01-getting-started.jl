@@ -81,68 +81,11 @@ Calcium scoring is a technique for measuring calcium in the coronary arteries wi
 This package allows users to compute the traditional Agatston score seen below.
 """
 
-# ╔═╡ 140d7064-df9e-4dc8-886e-edb381792164
-function create_mask(array, mask)
-    @assert size(array) == size(mask)
-    idxs = findall(x -> x == true, mask)
-    overlayed_mask = zeros(size(array))
-    for idx in idxs
-        overlayed_mask[idx] = array[idx]
-    end
-    return overlayed_mask
-end
-
 # ╔═╡ 31ba16d9-e51f-48ef-8731-fce208de1c30
 md"""
 ## Visualize
 Now let's dilate the mask a little bit, to account for partial volume effect (blurring) and visualize our ROI
 """
-
-# ╔═╡ 982837e3-6d4c-4012-a014-886d38d19121
-md"""
-#### Helper functions
-"""
-
-# ╔═╡ 107e9699-6baa-4978-a68f-9fc22d76d6a1
-function collect_tuple(tuple_array)
-    row_num = size(tuple_array)
-    col_num = length(tuple_array[1])
-    container = zeros(Int64, row_num..., col_num)
-    for i in 1:length(tuple_array)
-        container[i, :] = collect(tuple_array[i])
-    end
-    return container
-end
-
-# ╔═╡ ac9da8e2-aee9-4c79-8e7d-f35eb7e674f2
-function overlay_mask_bind(mask)
-    indices = findall(x -> x == 1, mask)
-    indices = Tuple.(indices)
-    label_array = collect_tuple(indices)
-    zs = unique(label_array[:, 3])
-    return PlutoUI.Slider(1:length(zs); default=2, show_value=true)
-end
-
-# ╔═╡ 4a14052c-5327-43a4-bf2e-ad739bf5213d
-function overlay_mask_plot(array, mask, var, title::AbstractString)
-    indices = findall(x -> x == 1, mask)
-    indices = Tuple.(indices)
-    label_array = collect_tuple(indices)
-    zs = unique(label_array[:, 3])
-    indices_lbl = findall(x -> x == zs[var], label_array[:, 3])
-
-    fig = Figure()
-    ax = Makie.Axis(fig[1, 1])
-    ax.title = title
-    heatmap!(array[:, :, zs[var]]; colormap=:grays)
-    scatter!(
-        label_array[:, 1][indices_lbl],
-        label_array[:, 2][indices_lbl];
-        markersize=5,
-        color=:red,
-    )
-    return fig
-end
 
 # ╔═╡ 943ad7b3-965a-45e9-b135-ad40432d1fde
 md"""
@@ -151,7 +94,7 @@ md"""
 
 # ╔═╡ 8b13e40c-b2fd-4f2d-856e-7605c5f5c0b7
 md"""
-We can also compute the calcium mass score, via the Agatston technique by computing the mass calibration factor. This factor translates an Agatston score to a mass score [1](https://pubs.rsna.org/doi/epdf/10.1148/radiol.2432050808).
+We can also compute the calcium mass score, via the Agatston technique by computing the mass calibration factor. This factor translates an Agatston score to a mass score ([1](https://pubs.rsna.org/doi/epdf/10.1148/radiol.2432050808)).
 
 We can assume the CT number of water is 0, and compute the correction factor by dividing the density of known calcium by the CT number of that same calcium.
 """
@@ -170,13 +113,13 @@ For a true calibration line, one would need to include known calcium density ins
 
 # ╔═╡ 477b8213-be8a-413b-a9cb-4bf5c3492747
 begin
-	calibration_densities = [0, 0.2, 0.4, 0.8] # mg/mm^3
+	calibration_densities = [0, 0.2, 0.4, 0.8]mg/mm^3
 	calibration_intensities = [0, 297.429, 545.245, 1075.82] # HU
 	df_calibration = DataFrame(:density => calibration_densities, :intensity => calibration_intensities)
 end
 
 # ╔═╡ 60b0f243-468c-4368-b9f0-d734edd476c0
-linearRegressor = lm(@formula(intensity ~ density), df_calibration);
+linearRegressor = lm(@formula(intensity ~ density), ustrip.(df_calibration));
 
 # ╔═╡ 2e35e337-e64c-4a62-af2d-bf93151781c2
 linearFit = GLM.predict(linearRegressor)
@@ -211,8 +154,8 @@ let
     f = Figure()
     ax1 = Axis(f[1, 1])
 
-    scatter!(calibration_densities, calibration_intensities)
-    lines!(calibration_densities, linearFit; color=:red)
+    scatter!(ustrip.(calibration_densities), calibration_intensities)
+    lines!(ustrip.(calibration_densities), linearFit; color=:red)
     ax1.title = "Calibration Line (Intensity vs Density)"
     ax1.ylabel = "Intensity (HU)"
     ax1.xlabel = "Density (mg/cm^3)"
@@ -278,7 +221,7 @@ md"""
 # ╔═╡ 42beb6fe-c990-498a-ac8f-d50714bae2cd
 md"""
 ## Create Simulated Images
-To understand calcium scoring, we will create simulated CT coronary artery calcium images.
+To understand calcium scoring, we will create a simulated CT coronary artery calcium image.
 
 First, let's create a 2D coronary artery calcification with a density of 0.2 ``mg/mm^{3}`` and an intensity value of 300 HU. We will place this in simulated heart tissue with a simulated intensity value of 40 HU. We will also prepare each voxel to be of size = [0.5, 0.5, 0.5] ``mm^{3}``
 """
@@ -322,7 +265,7 @@ function create_coronary_calcification(mask, hu_calcium, hu_heart_tissue)
 end
 
 # ╔═╡ 4fd875fa-e26d-4108-a90c-68090d97fb6c
-mask = create_circular_mask(100, 100, (50, 50), 5);
+mask = create_circular_mask(400, 400, (200, 200), 15);
 
 # ╔═╡ 98414c92-9a3c-44d5-9893-0670c34af5ab
 begin
@@ -333,14 +276,8 @@ end;
 # ╔═╡ 51649204-97fe-460b-935e-06a29bb85d5b
 dilated_mask_3D = dilate(dilate(dilate(dilate(dilate(dilate(dilate(mask_3D)))))));
 
-# ╔═╡ 83246419-b0e2-478c-bb0d-a7ab12c6ecd7
-@bind c overlay_mask_bind(dilated_mask_3D)
-
 # ╔═╡ 0cb27e66-f2c0-4245-898c-9d2ebdcd0636
 ring_mask_3D = Bool.(dilate(dilate(dilate(dilate(dilate(dilate(dilate(mask_3D))))))) - dilate(dilate(dilate(dilate(dilate(mask_3D))))));
-
-# ╔═╡ f0b9b969-eca7-4da8-a95f-a5aef1597a32
-@bind g4 overlay_mask_bind(ring_mask_3D)
 
 # ╔═╡ 935d3fdd-5a1d-4354-9046-41cb6c852a2b
 pure_calcification = create_coronary_calcification(mask, hu_calcium, hu_heart_tissue);
@@ -397,50 +334,8 @@ let
 	f
 end
 
-# ╔═╡ 907fe9d2-a67e-4716-9c73-0ce429ae2b4f
-overlay_mask_plot(gaussian_poisson_calcification_3D, dilated_mask_3D, c, "Overlayed Mask")
-
-# ╔═╡ e77c3179-ade5-47d2-b81c-c97087161632
-overlayed_mask = create_mask(gaussian_poisson_calcification_3D, dilated_mask_3D);
-
-# ╔═╡ 913619e8-80ae-4130-831e-9f12941e16a2
-heatmap(overlayed_mask[:, :, c], colormap=:grays)
-
-# ╔═╡ ade72d79-4082-4c4e-b14a-744651731d9d
-begin
-	mass_calibration = ρ_calcium / hu_calcium
-	agatston_score, volume_score, mass_score = score(overlayed_mask, spacing, mass_calibration, Agatston())
-end
-
-# ╔═╡ 320405f5-4feb-4c61-98f4-ff13643490ae
-md"""
-Let's compare that with the ground truth mass
-
-We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(mass_score)
-"""
-
-# ╔═╡ 15a6ff92-a3c1-4ff1-bc4b-674adbc53c0d
-swcs = score(overlayed_mask, μ, σ, SpatiallyWeighted())
-
-# ╔═╡ 1e763d9c-44e8-4614-94fb-be9b65f100a9
-md"""
-We see that the spatially weighted calcium score (`swcs` = $(swcs)) is very similar to the Agatston score (`agatston_score` = $(agatston_score))
-"""
-
-# ╔═╡ 757901be-3d2f-4bea-9054-469cf7a18998
-calculated_scores = [agatston_score, swcs]
-
-# ╔═╡ f46b4cd0-cfc1-48fd-b964-b8cc282f8f53
-df_results = DataFrame(
-	technique = ["Agatston", "Spatially Weighted"],
-	calculated_scores = calculated_scores
-)
-
 # ╔═╡ 8fe84415-a1e2-4180-bc4d-02dc1b3fbd08
 size(ring_mask_3D), size(gaussian_poisson_calcification_3D)
-
-# ╔═╡ 98448e7c-3c24-4ede-9adb-3691e68d0742
-overlay_mask_plot(gaussian_poisson_calcification_3D, ring_mask_3D, g4, "Ring mask")
 
 # ╔═╡ 205d0159-13ef-4483-98c5-b4f86bb59510
 gaussian_poisson_calcification_3D[ring_mask_3D]
@@ -458,7 +353,7 @@ end
 md"""
 Let's compare that with the ground truth mass
 
-We see that the ground truth mass = $(ground_truth_calcium_mass) mg is close to the calculated mass = $(mass_integrated_score) mg
+We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(mass_integrated_score)
 """
 
 # ╔═╡ 7635fbef-61fa-4311-bda4-f7f384a4832d
@@ -470,16 +365,6 @@ Let's compare that with the ground truth mass
 
 We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(volume_fraction_mass)
 """
-
-# ╔═╡ 8df54213-6240-45d5-baaf-36a81094f998
-calculated_masses = [mass_score, mass_integrated_score, volume_fraction_mass]
-
-# ╔═╡ 879aafa3-a9b3-4a8e-bd54-6068be270332
-df_results_masses = DataFrame(
-	technique = ["Agatston", "Integrated", "Volume Fraction"],
-	ground_truth_calcium_mass = repeat([ground_truth_calcium_mass], 3),
-	calculated_calcium_mass = calculated_masses
-)
 
 # ╔═╡ 8fc2a4c9-fbfb-4ebd-b8ce-21bbed3b16e8
 md"""
@@ -509,6 +394,121 @@ md"""
 # ╔═╡ de8d4d1d-dc8d-4a47-b51c-7a2097f8f741
 heatmap(gaussian_poisson_calcification_3D[:, :, b1], colormap=:grays)
 
+# ╔═╡ 982837e3-6d4c-4012-a014-886d38d19121
+md"""
+#### Helper functions
+"""
+
+# ╔═╡ 107e9699-6baa-4978-a68f-9fc22d76d6a1
+function collect_tuple(tuple_array)
+    row_num = size(tuple_array)
+    col_num = length(tuple_array[1])
+    container = zeros(Int64, row_num..., col_num)
+    for i in 1:length(tuple_array)
+        container[i, :] = collect(tuple_array[i])
+    end
+    return container
+end
+
+# ╔═╡ ac9da8e2-aee9-4c79-8e7d-f35eb7e674f2
+function overlay_mask_bind(mask)
+    indices = findall(x -> x == 1, mask)
+    indices = Tuple.(indices)
+    label_array = collect_tuple(indices)
+    zs = unique(label_array[:, 3])
+    return PlutoUI.Slider(1:length(zs); default=2, show_value=true)
+end
+
+# ╔═╡ 83246419-b0e2-478c-bb0d-a7ab12c6ecd7
+@bind c overlay_mask_bind(dilated_mask_3D)
+
+# ╔═╡ f0b9b969-eca7-4da8-a95f-a5aef1597a32
+@bind g4 overlay_mask_bind(ring_mask_3D)
+
+# ╔═╡ 4a14052c-5327-43a4-bf2e-ad739bf5213d
+function overlay_mask_plot(array, mask, var, title::AbstractString)
+    indices = findall(x -> x == 1, mask)
+    indices = Tuple.(indices)
+    label_array = collect_tuple(indices)
+    zs = unique(label_array[:, 3])
+    indices_lbl = findall(x -> x == zs[var], label_array[:, 3])
+
+    fig = Figure()
+    ax = Makie.Axis(fig[1, 1])
+    ax.title = title
+    heatmap!(array[:, :, zs[var]]; colormap=:grays)
+    scatter!(
+        label_array[:, 1][indices_lbl],
+        label_array[:, 2][indices_lbl];
+        markersize=1.2,
+        color=:red,
+    )
+    return fig
+end
+
+# ╔═╡ 907fe9d2-a67e-4716-9c73-0ce429ae2b4f
+overlay_mask_plot(gaussian_poisson_calcification_3D, dilated_mask_3D, c, "Overlayed Mask")
+
+# ╔═╡ 98448e7c-3c24-4ede-9adb-3691e68d0742
+overlay_mask_plot(gaussian_poisson_calcification_3D, ring_mask_3D, g4, "Ring mask")
+
+# ╔═╡ 140d7064-df9e-4dc8-886e-edb381792164
+function create_mask(array, mask)
+    @assert size(array) == size(mask)
+    idxs = findall(x -> x == true, mask)
+    overlayed_mask = zeros(size(array))
+    for idx in idxs
+        overlayed_mask[idx] = array[idx]
+    end
+    return overlayed_mask
+end
+
+# ╔═╡ e77c3179-ade5-47d2-b81c-c97087161632
+overlayed_mask = create_mask(gaussian_poisson_calcification_3D, dilated_mask_3D);
+
+# ╔═╡ 913619e8-80ae-4130-831e-9f12941e16a2
+heatmap(overlayed_mask[:, :, c], colormap=:grays)
+
+# ╔═╡ ade72d79-4082-4c4e-b14a-744651731d9d
+begin
+	mass_calibration = ρ_calcium / hu_calcium
+	agatston_score, volume_score, mass_score = score(overlayed_mask, spacing, mass_calibration, Agatston())
+end
+
+# ╔═╡ 320405f5-4feb-4c61-98f4-ff13643490ae
+md"""
+Let's compare that with the ground truth mass
+
+We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(mass_score)
+"""
+
+# ╔═╡ 8df54213-6240-45d5-baaf-36a81094f998
+calculated_masses = [mass_score, mass_integrated_score, volume_fraction_mass]
+
+# ╔═╡ 879aafa3-a9b3-4a8e-bd54-6068be270332
+df_results_masses = DataFrame(
+	technique = ["Agatston", "Integrated", "Volume Fraction"],
+	ground_truth_calcium_mass = repeat([ground_truth_calcium_mass], 3),
+	calculated_calcium_mass = calculated_masses
+)
+
+# ╔═╡ 15a6ff92-a3c1-4ff1-bc4b-674adbc53c0d
+swcs = score(overlayed_mask, μ, σ, SpatiallyWeighted())
+
+# ╔═╡ 1e763d9c-44e8-4614-94fb-be9b65f100a9
+md"""
+We see that the spatially weighted calcium score (`swcs` = $(swcs)) is very similar to the Agatston score (`agatston_score` = $(agatston_score))
+"""
+
+# ╔═╡ 757901be-3d2f-4bea-9054-469cf7a18998
+calculated_scores = [agatston_score, swcs]
+
+# ╔═╡ f46b4cd0-cfc1-48fd-b964-b8cc282f8f53
+df_results = DataFrame(
+	technique = ["Agatston", "Spatially Weighted"],
+	calculated_scores = calculated_scores
+)
+
 # ╔═╡ Cell order:
 # ╟─d6254d97-3b3b-4b2f-b7b3-8bc58e6f34c2
 # ╟─f3a886e7-31e8-43dd-adc7-3fb50c7d7d23
@@ -522,13 +522,8 @@ heatmap(gaussian_poisson_calcification_3D[:, :, b1], colormap=:grays)
 # ╟─5c64de6c-2143-43a5-94cf-a7cdb6e4e210
 # ╟─0a3c60e5-b695-41e4-b43d-45b2b56c5b7e
 # ╟─13bf4d31-e155-41ee-81c1-55b2b6f28ecd
-# ╟─140d7064-df9e-4dc8-886e-edb381792164
 # ╟─31ba16d9-e51f-48ef-8731-fce208de1c30
 # ╠═51649204-97fe-460b-935e-06a29bb85d5b
-# ╟─982837e3-6d4c-4012-a014-886d38d19121
-# ╟─107e9699-6baa-4978-a68f-9fc22d76d6a1
-# ╟─ac9da8e2-aee9-4c79-8e7d-f35eb7e674f2
-# ╟─4a14052c-5327-43a4-bf2e-ad739bf5213d
 # ╟─83246419-b0e2-478c-bb0d-a7ab12c6ecd7
 # ╟─907fe9d2-a67e-4716-9c73-0ce429ae2b4f
 # ╠═e77c3179-ade5-47d2-b81c-c97087161632
@@ -592,3 +587,8 @@ heatmap(gaussian_poisson_calcification_3D[:, :, b1], colormap=:grays)
 # ╟─fab1b8ab-b262-4b81-a512-2cd37f120a05
 # ╟─da8644ad-a3bc-41aa-a108-90096f5edbb1
 # ╟─de8d4d1d-dc8d-4a47-b51c-7a2097f8f741
+# ╟─982837e3-6d4c-4012-a014-886d38d19121
+# ╟─107e9699-6baa-4978-a68f-9fc22d76d6a1
+# ╟─ac9da8e2-aee9-4c79-8e7d-f35eb7e674f2
+# ╟─4a14052c-5327-43a4-bf2e-ad739bf5213d
+# ╟─140d7064-df9e-4dc8-886e-edb381792164
