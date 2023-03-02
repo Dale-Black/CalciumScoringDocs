@@ -478,7 +478,7 @@ high_energy_intensity = mean(gaussian_poisson_calcification_3D_high_measure[dila
 # ╔═╡ b4269f46-bdb4-4da6-acce-2f31f143d36a
 begin
 	material_decomposition_mass = score(low_energy_intensity, high_energy_intensity, ps, vol_ROI, MaterialDecomposition())
-	material_decomposition_mass =  (material_decomposition_mass)mg/mm^3
+	material_decomposition_mass = (material_decomposition_mass)mg/mm^3
 end
 
 # ╔═╡ 87c3f233-3607-4805-9394-16b6857a5887
