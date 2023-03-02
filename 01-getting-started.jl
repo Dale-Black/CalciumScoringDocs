@@ -67,6 +67,12 @@ md"""
 Since we know the intensity value for every calcium voxel in the `pure_calcification_3D` array should be 200, we can calculate the number of calcium voxels in that array directly. We can then multiply this by the voxel size to determine the ground truth calcium volume. Lastly, we can take the density of calcium and multiply it by the volume to determine the mass of the calcium
 """
 
+# ╔═╡ 0188bed1-93f4-4e95-b581-0ea64847faac
+md"""
+# Visualize Calcification
+Below, in the appendix, we created a simulated image containing a calcification at the center. Let's visualize this image below.
+"""
+
 # ╔═╡ 13bf4d31-e155-41ee-81c1-55b2b6f28ecd
 md"""
 # 1. Agatston Scoring
@@ -377,6 +383,20 @@ begin
 	gaussian_poisson_calcification_3D = cat(gaussian_poisson_calcification1, gaussian_poisson_calcification2, gaussian_poisson_calcification3, gaussian_poisson_calcification4, dims=3)
 end;
 
+# ╔═╡ 5c64de6c-2143-43a5-94cf-a7cdb6e4e210
+@bind x PlutoUI.Slider(axes(gaussian_poisson_calcification_3D, 3); default=2, show_value=true)
+
+# ╔═╡ 0a3c60e5-b695-41e4-b43d-45b2b56c5b7e
+let
+	f = Figure()
+	ax = CairoMakie.Axis(
+		f[1, 1],
+		title = "Simulated Calcification Image"
+	)
+	heatmap!(gaussian_poisson_calcification_3D[:, :, x], colormap=:grays)
+	f
+end
+
 # ╔═╡ 907fe9d2-a67e-4716-9c73-0ce429ae2b4f
 overlay_mask_plot(gaussian_poisson_calcification_3D, dilated_mask_3D, c, "Overlayed Mask")
 
@@ -498,6 +518,9 @@ heatmap(gaussian_poisson_calcification_3D[:, :, b1], colormap=:grays)
 # ╠═b0afd734-56ea-45df-bf68-a282a9ef7112
 # ╠═b667c99e-a012-4418-b641-b7dfce71332f
 # ╠═93123baf-d4ad-4959-b4df-7f859654f191
+# ╟─0188bed1-93f4-4e95-b581-0ea64847faac
+# ╟─5c64de6c-2143-43a5-94cf-a7cdb6e4e210
+# ╟─0a3c60e5-b695-41e4-b43d-45b2b56c5b7e
 # ╟─13bf4d31-e155-41ee-81c1-55b2b6f28ecd
 # ╟─140d7064-df9e-4dc8-886e-edb381792164
 # ╟─31ba16d9-e51f-48ef-8731-fce208de1c30

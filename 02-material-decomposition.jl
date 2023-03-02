@@ -69,7 +69,7 @@ Since we created the calcifications as a circular mask, we know the exact geomet
 # ╔═╡ 2f33b7b1-1a52-41e3-8521-f15f5594e971
 md"""
 # Determine Calibration Parameters
-To determine the calibration parameters for calcium mass measurement, we first require a simulated calibration dual-energy image (low and high energy), with various calcium rods and known calcium densities. Below, in the appendix, we created such images.
+To determine the calibration parameters for calcium mass measurement, we first require a simulated calibration dual-energy image (low and high energy), with various calcium rods and known calcium densities. Below, in the appendix, we created such images. Let's quickly visualize these images below.
 """
 
 # ╔═╡ a528497a-0b2d-4561-836f-69a57d94e0db
@@ -254,6 +254,9 @@ begin
 	gaussian_poisson_calcification_3D_low = cat(gaussian_poisson_calcification1_low, gaussian_poisson_calcification2_low, gaussian_poisson_calcification3_low, gaussian_poisson_calcification4_low, dims=3)
 end;
 
+# ╔═╡ b8977e39-f5c4-4d3d-a6e2-104d5f11b549
+@bind x PlutoUI.Slider(axes(gaussian_poisson_calcification_3D_low, 3); default=2, show_value=true)
+
 # ╔═╡ 48ca6e64-010f-4460-8a2f-2eaf06cde1ec
 means1 = [
 	mean(gaussian_poisson_calcification_3D_low[erode(erode(mask0_3D))]), mean(gaussian_poisson_calcification_3D_low[erode(erode(mask1_3D))]), mean(gaussian_poisson_calcification_3D_low[erode(erode(mask2_3D))]), mean(gaussian_poisson_calcification_3D_low[erode(erode(mask3_3D))]), mean(gaussian_poisson_calcification_3D_low[erode(erode(mask4_3D))]), mean(gaussian_poisson_calcification_3D_low[erode(erode(mask5_3D))]), mean(gaussian_poisson_calcification_3D_low[erode(erode(mask6_3D))]),
@@ -322,6 +325,24 @@ md"""
 
 # ╔═╡ 02721b3d-3a23-4633-9706-40c94856b91d
 @bind a PlutoUI.Slider(axes(pure_calcification_3D_low, 3); default=2, show_value=true)
+
+# ╔═╡ 9cfd3199-e014-4c38-97d4-a2493e0ac437
+let
+	f = Figure(resolution=(800, 500))
+	ax = CairoMakie.Axis(
+		f[1, 1],
+		title = "Low Energy Calibration Image"
+	)
+	heatmap!(gaussian_poisson_calcification_3D_low[:, :, a], colormap=:grays)
+
+	ax = CairoMakie.Axis(
+		f[1, 2],
+		title = "High Energy Calibration Image"
+	)
+	heatmap!(gaussian_poisson_calcification_3D_high[:, :, a], colormap=:grays)
+
+	f
+end
 
 # ╔═╡ c7e6d66d-18f9-4795-89ed-11c5c312d8f4
 md"""
@@ -586,6 +607,8 @@ overlay_mask_plot(gaussian_poisson_calcification_3D_high_measure, dilated_mask_3
 # ╠═04b354df-36cd-422c-b5a1-09f19a0662ed
 # ╠═dd93a5d6-fa5f-4a80-9b76-79abe755e833
 # ╟─2f33b7b1-1a52-41e3-8521-f15f5594e971
+# ╟─b8977e39-f5c4-4d3d-a6e2-104d5f11b549
+# ╟─9cfd3199-e014-4c38-97d4-a2493e0ac437
 # ╟─a528497a-0b2d-4561-836f-69a57d94e0db
 # ╠═48ca6e64-010f-4460-8a2f-2eaf06cde1ec
 # ╠═e27cf9d6-62b1-49d6-9bc1-07f7f6711af0
