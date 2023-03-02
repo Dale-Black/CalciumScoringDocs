@@ -41,11 +41,7 @@ end
 # ╔═╡ 0a38e736-a860-49b6-9152-a51f33012117
 md"""
 # Overview
-This tutorial will briefly showcase different calcium scoring techniques available in CalciumScoring.jl. Specifically (1) **Agatston Scoring** which is the current gold standard, (2) **integrated calcium mass**, (3) **volume fraction calcium mass**, and (4) **spatially weighted calcium scoring**
-
-These techniques provide quantitative measures of calcium from non-contrast CT images. Every calcium mass technique calculates calcium mass via a calibration factor.
-
-Calcium scoring also contains **material decomposition calcium mass**, another calcium measurement technique based on dual-energy material decomposition. [Click here](https://glassnotebook.io/repo/31) to get started using the material decomposition calcium mass technique.
+This tutorial will show how to calculate the calcium mass in a non-contrast dual-energy CT image using the `MaterialDecomposition()` technique from CalciumScoring.jl
 """
 
 # ╔═╡ 805556cc-0ed5-4b60-909b-933626c93e95
