@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.22
+# v0.19.26
 
 using Markdown
 using InteractiveUtils
@@ -19,7 +19,7 @@ end
 begin
 	let
 		using Pkg
-		Pkg.activate(mktempdir())
+		Pkg.activate(temp = true)
 		Pkg.Registry.update()
 		Pkg.add("PlutoUI")
 		Pkg.add("CairoMakie")
@@ -30,12 +30,11 @@ begin
 		Pkg.add("Statistics")
 		Pkg.add("ImageFiltering")
 		Pkg.add("Noise")
-		Pkg.add("Unitful")
+		Pkg.add("DICOM")
 		Pkg.add(url="https://github.com/Dale-Black/CalciumScoring.jl")
 	end
 	
-	using PlutoUI, CSV, DataFrames, CairoMakie, ImageMorphology, GLM, Statistics, ImageFiltering, Noise, Unitful, CalciumScoring
-	using Unitful: mm, mg
+	using PlutoUI, CSV, DataFrames, CairoMakie, ImageMorphology, GLM, Statistics, ImageFiltering, Noise, DICOM, CalciumScoring
 end
 
 # ╔═╡ d6254d97-3b3b-4b2f-b7b3-8bc58e6f34c2
@@ -67,11 +66,34 @@ md"""
 Since we know the intensity value for every calcium voxel in the `pure_calcification_3D` array should be 200, we can calculate the number of calcium voxels in that array directly. We can then multiply this by the voxel size to determine the ground truth calcium volume. Lastly, we can take the density of calcium and multiply it by the volume to determine the mass of the calcium
 """
 
+# ╔═╡ b0afd734-56ea-45df-bf68-a282a9ef7112
+ground_truth_number_voxels = length(findall(x -> x == hu_calcium, pure_calcification_3D))
+
+# ╔═╡ b667c99e-a012-4418-b641-b7dfce71332f
+ground_truth_calcium_volume = ground_truth_number_voxels * voxel_size
+
+# ╔═╡ 93123baf-d4ad-4959-b4df-7f859654f191
+ground_truth_calcium_mass = ground_truth_calcium_volume * ρ_calcium
+
 # ╔═╡ 0188bed1-93f4-4e95-b581-0ea64847faac
 md"""
 # Visualize Calcification
 Below, in the appendix, we created a simulated image containing a calcification at the center. Let's visualize this image below.
 """
+
+# ╔═╡ 5c64de6c-2143-43a5-94cf-a7cdb6e4e210
+@bind x PlutoUI.Slider(axes(gaussian_poisson_calcification_3D, 3); default=2, show_value=true)
+
+# ╔═╡ 0a3c60e5-b695-41e4-b43d-45b2b56c5b7e
+let
+	f = Figure()
+	ax = CairoMakie.Axis(
+		f[1, 1],
+		title = "Simulated Calcification Image"
+	)
+	heatmap!(gaussian_poisson_calcification_3D[:, :, x], colormap=:grays)
+	f
+end
 
 # ╔═╡ 13bf4d31-e155-41ee-81c1-55b2b6f28ecd
 md"""
@@ -86,6 +108,9 @@ md"""
 ## Visualize
 Now let's dilate the mask a little bit, to account for partial volume effect (blurring) and visualize our ROI
 """
+
+# ╔═╡ 51649204-97fe-460b-935e-06a29bb85d5b
+dilated_mask_3D = dilate(dilate(dilate(dilate(dilate(dilate(dilate(mask_3D)))))));
 
 # ╔═╡ 943ad7b3-965a-45e9-b135-ad40432d1fde
 md"""
@@ -168,10 +193,38 @@ md"""
 ## Background mask
 """
 
+# ╔═╡ 0cb27e66-f2c0-4245-898c-9d2ebdcd0636
+ring_mask_3D = Bool.(dilate(dilate(dilate(dilate(dilate(dilate(dilate(mask_3D))))))) - dilate(dilate(dilate(dilate(dilate(mask_3D))))));
+
+# ╔═╡ 8fe84415-a1e2-4180-bc4d-02dc1b3fbd08
+size(ring_mask_3D), size(gaussian_poisson_calcification_3D)
+
+# ╔═╡ 205d0159-13ef-4483-98c5-b4f86bb59510
+gaussian_poisson_calcification_3D[ring_mask_3D]
+
 # ╔═╡ ffff8cbd-fbeb-4a5d-bb3f-560ec2973137
 md"""
 ## Results
 Since we have a calibration line, we don't actually need to directly measure the pure calcium signal ``S_{Obj}``. This is beneficial because segmenting pure calcium would be impractical for small calcifications. This also means we don't need to worry about heterogenous calcifications. We can assume the calcium is any density we want (within the calibration range), and if we keep the density consistent with the density used for ``S_{Obj}``, then the calculation will work out.
+"""
+
+# ╔═╡ f63e8885-aa22-418c-b3db-886fe1f2945e
+S_Bkg = mean(gaussian_poisson_calcification_3D[ring_mask_3D])
+
+# ╔═╡ e574fb88-fa85-4efc-b64b-c1bb39473cec
+	S_Obj = intensity(ρ_calcium)
+
+# ╔═╡ 04446f5f-eda2-4ae9-93e8-ccba84b26014
+begin
+    alg_integrated = Integrated(gaussian_poisson_calcification_3D[dilated_mask_3D])
+    mass_integrated_score = score(S_Bkg, S_Obj, spacing, ρ_calcium, alg_integrated)
+end
+
+# ╔═╡ 128e32e5-4ddb-4f18-875f-e28e5b548d2c
+md"""
+Let's compare that with the ground truth mass
+
+We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(mass_integrated_score)
 """
 
 # ╔═╡ 122317ec-7c00-4b1e-9045-1314f444e56d
@@ -183,6 +236,16 @@ We will examine a simple yet powerful calcium quantification technique. This tec
 # ╔═╡ 017fe43a-df10-40d9-b9d1-d93d71500bd0
 md"""
 ## Results
+"""
+
+# ╔═╡ 7635fbef-61fa-4311-bda4-f7f384a4832d
+volume_fraction_mass = score(gaussian_poisson_calcification_3D[dilated_mask_3D], hu_calcium, hu_heart_tissue, voxel_size, ρ_calcium, VolumeFraction())
+
+# ╔═╡ 11c49d54-2088-4f6c-83a1-129960889492
+md"""
+Let's compare that with the ground truth mass
+
+We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(volume_fraction_mass)
 """
 
 # ╔═╡ a91fd5a5-cd7b-4676-a6c3-13d8c81453d9
@@ -218,181 +281,17 @@ md"""
 # Appendix
 """
 
-# ╔═╡ 42beb6fe-c990-498a-ac8f-d50714bae2cd
+# ╔═╡ fac54db6-e2a1-4956-8b7c-091938e74b8e
 md"""
-## Create Simulated Images
-To understand calcium scoring, we will create a simulated CT coronary artery calcium image.
-
-First, let's create a 2D coronary artery calcification with a density of 0.2 ``mg/mm^{3}`` and an intensity value of 300 HU. We will place this in simulated heart tissue with a simulated intensity value of 40 HU. We will also prepare each voxel to be of size = [0.5, 0.5, 0.5] ``mm^{3}``
+#### Load Simulated Phantoms
 """
 
-# ╔═╡ 8d42cd4a-8dce-49c8-a9d8-2a5195e1a9b4
+# ╔═╡ 29b04989-caa7-4e73-a9a1-cdad9e3509d8
 begin
-	ρ_heart_tissue = 1.055mg/mm^3
-	ρ_calcium = 0.2mg/mm^3
-
-	hu_heart_tissue = 40 # HU
-	hu_calcium = 280 # HU
-
-	spacing = [0.5, 0.5, 0.5]mm
-	voxel_size = spacing[1] * spacing[2] * spacing[3]
-end
-
-# ╔═╡ e574fb88-fa85-4efc-b64b-c1bb39473cec
-	S_Obj = intensity(ρ_calcium)
-
-# ╔═╡ 0b95fc1a-fc24-4649-9a2b-98731bc9e2ef
-function create_circular_mask(h, w, center_circle, radius_circle)
-    Y, X = collect(1:h), collect(1:w)'
-    dist_from_center = sqrt.((X .- center_circle[1]) .^ 2 .+ (Y .- center_circle[2]) .^ 2)
-    mask = dist_from_center .<= radius_circle
-    return mask
-end
-
-# ╔═╡ 84e49770-1ad5-4239-b2fb-4a6a32dc6406
-function create_coronary_calcification(mask, hu_calcium, hu_heart_tissue)
-	new_mask = zeros(size(mask))
-	for i in axes(mask, 1)
-		for j in axes(mask, 2)
-			if mask[i, j] == 1
-				new_mask[i, j] = hu_calcium
-			else
-				new_mask[i, j] = hu_heart_tissue
-			end
-		end
-	end
-	return new_mask
-end
-
-# ╔═╡ 4fd875fa-e26d-4108-a90c-68090d97fb6c
-mask = create_circular_mask(400, 400, (200, 200), 15);
-
-# ╔═╡ 98414c92-9a3c-44d5-9893-0670c34af5ab
-begin
-	mask_3D = cat(mask, mask, dims=3)
-	mask_3D = cat(mask_3D, mask_3D, dims=3)
+	dcm_path = joinpath(pwd(), "dcms/val/52_59_73/medium/80");
+	dcms = dcmdir_parse(dcm_path)
+	dcm_array = cat([dcms[i][(0x7fe0, 0x0010)] for i in 1:length(dcms)]...; dims=3)
 end;
-
-# ╔═╡ 51649204-97fe-460b-935e-06a29bb85d5b
-dilated_mask_3D = dilate(dilate(dilate(dilate(dilate(dilate(dilate(mask_3D)))))));
-
-# ╔═╡ 0cb27e66-f2c0-4245-898c-9d2ebdcd0636
-ring_mask_3D = Bool.(dilate(dilate(dilate(dilate(dilate(dilate(dilate(mask_3D))))))) - dilate(dilate(dilate(dilate(dilate(mask_3D))))));
-
-# ╔═╡ 935d3fdd-5a1d-4354-9046-41cb6c852a2b
-pure_calcification = create_coronary_calcification(mask, hu_calcium, hu_heart_tissue);
-
-# ╔═╡ a899a7c7-9b91-4fdf-a9bb-0c15f56a03cb
-md"""
-Now, let's simulate 3D by stacking this slice along the third dimension
-"""
-
-# ╔═╡ 5bbf3126-5072-4525-a554-e445245a2902
-pure_calcification_3D = cat(pure_calcification, pure_calcification, pure_calcification, pure_calcification, dims=3);
-
-# ╔═╡ b0afd734-56ea-45df-bf68-a282a9ef7112
-ground_truth_number_voxels = length(findall(x -> x == hu_calcium, pure_calcification_3D))
-
-# ╔═╡ b667c99e-a012-4418-b641-b7dfce71332f
-ground_truth_calcium_volume = ground_truth_number_voxels * voxel_size
-
-# ╔═╡ 93123baf-d4ad-4959-b4df-7f859654f191
-ground_truth_calcium_mass = ground_truth_calcium_volume * ρ_calcium
-
-# ╔═╡ b950dc48-fdb6-4eed-b18a-7497952375e3
-md"""
-Finally, let's add a gaussian filter and poisson noise to simulate a more realistic coronary artery calcification
-"""
-
-# ╔═╡ 1272984e-b753-4b9a-8441-2eb0b68ba3b4
-begin
-	gaussian_calcification1 = imfilter(pure_calcification, Kernel.gaussian(3))
-	gaussian_calcification2 = imfilter(pure_calcification, Kernel.gaussian(3))
-	gaussian_calcification3 = imfilter(pure_calcification, Kernel.gaussian(3))
-	gaussian_calcification4 = imfilter(pure_calcification, Kernel.gaussian(3))
-	
-	gaussian_poisson_calcification1 = poisson(gaussian_calcification1, 100)
-	gaussian_poisson_calcification2 = poisson(gaussian_calcification2, 100)
-	gaussian_poisson_calcification3 = poisson(gaussian_calcification3, 100)
-	gaussian_poisson_calcification4 = poisson(gaussian_calcification4, 100)
-
-	
-	gaussian_poisson_calcification_3D = cat(gaussian_poisson_calcification1, gaussian_poisson_calcification2, gaussian_poisson_calcification3, gaussian_poisson_calcification4, dims=3)
-end;
-
-# ╔═╡ 5c64de6c-2143-43a5-94cf-a7cdb6e4e210
-@bind x PlutoUI.Slider(axes(gaussian_poisson_calcification_3D, 3); default=2, show_value=true)
-
-# ╔═╡ 0a3c60e5-b695-41e4-b43d-45b2b56c5b7e
-let
-	f = Figure()
-	ax = CairoMakie.Axis(
-		f[1, 1],
-		title = "Simulated Calcification Image"
-	)
-	heatmap!(gaussian_poisson_calcification_3D[:, :, x], colormap=:grays)
-	f
-end
-
-# ╔═╡ 8fe84415-a1e2-4180-bc4d-02dc1b3fbd08
-size(ring_mask_3D), size(gaussian_poisson_calcification_3D)
-
-# ╔═╡ 205d0159-13ef-4483-98c5-b4f86bb59510
-gaussian_poisson_calcification_3D[ring_mask_3D]
-
-# ╔═╡ f63e8885-aa22-418c-b3db-886fe1f2945e
-S_Bkg = mean(gaussian_poisson_calcification_3D[ring_mask_3D])
-
-# ╔═╡ 04446f5f-eda2-4ae9-93e8-ccba84b26014
-begin
-    alg_integrated = Integrated(gaussian_poisson_calcification_3D[dilated_mask_3D])
-    mass_integrated_score = score(S_Bkg, S_Obj, spacing, ρ_calcium, alg_integrated)
-end
-
-# ╔═╡ 128e32e5-4ddb-4f18-875f-e28e5b548d2c
-md"""
-Let's compare that with the ground truth mass
-
-We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(mass_integrated_score)
-"""
-
-# ╔═╡ 7635fbef-61fa-4311-bda4-f7f384a4832d
-volume_fraction_mass = score(gaussian_poisson_calcification_3D[dilated_mask_3D], hu_calcium, hu_heart_tissue, voxel_size, ρ_calcium, VolumeFraction())
-
-# ╔═╡ 11c49d54-2088-4f6c-83a1-129960889492
-md"""
-Let's compare that with the ground truth mass
-
-We see that the ground truth mass = $(ground_truth_calcium_mass) is close to the calculated mass = $(volume_fraction_mass)
-"""
-
-# ╔═╡ 8fc2a4c9-fbfb-4ebd-b8ce-21bbed3b16e8
-md"""
-### Visualize
-Below we will visualize the pure coronary artery calcification along with a more realistic simulated coronary artery calcification with added noise and blurring
-"""
-
-# ╔═╡ 29d8f4da-05f1-40aa-b613-a0a4cd7ba488
-md"""
-#### Coronary Artery Calcification (Ideal)
-"""
-
-# ╔═╡ 410748b3-474b-4055-8ed4-9130a41725bf
-@bind a PlutoUI.Slider(axes(pure_calcification_3D, 3); default=2, show_value=true)
-
-# ╔═╡ 8ba66bda-e4c9-4c8f-b8a8-893a1e88883c
-heatmap(pure_calcification_3D[:, :, a], colormap=:grays)
-
-# ╔═╡ fab1b8ab-b262-4b81-a512-2cd37f120a05
-md"""
-#### Coronary Artery Calcification (Noisy)
-"""
-
-# ╔═╡ da8644ad-a3bc-41aa-a108-90096f5edbb1
-@bind b1 PlutoUI.Slider(axes(pure_calcification_3D, 3); default=2, show_value=true)
-
-# ╔═╡ de8d4d1d-dc8d-4a47-b51c-7a2097f8f741
-heatmap(gaussian_poisson_calcification_3D[:, :, b1], colormap=:grays)
 
 # ╔═╡ 982837e3-6d4c-4012-a014-886d38d19121
 md"""
@@ -569,24 +468,8 @@ df_results = DataFrame(
 # ╠═757901be-3d2f-4bea-9054-469cf7a18998
 # ╠═f46b4cd0-cfc1-48fd-b964-b8cc282f8f53
 # ╟─7484f5a6-0cbc-451f-b790-aea05813c425
-# ╟─42beb6fe-c990-498a-ac8f-d50714bae2cd
-# ╠═8d42cd4a-8dce-49c8-a9d8-2a5195e1a9b4
-# ╟─0b95fc1a-fc24-4649-9a2b-98731bc9e2ef
-# ╟─84e49770-1ad5-4239-b2fb-4a6a32dc6406
-# ╠═4fd875fa-e26d-4108-a90c-68090d97fb6c
-# ╠═98414c92-9a3c-44d5-9893-0670c34af5ab
-# ╠═935d3fdd-5a1d-4354-9046-41cb6c852a2b
-# ╟─a899a7c7-9b91-4fdf-a9bb-0c15f56a03cb
-# ╠═5bbf3126-5072-4525-a554-e445245a2902
-# ╟─b950dc48-fdb6-4eed-b18a-7497952375e3
-# ╠═1272984e-b753-4b9a-8441-2eb0b68ba3b4
-# ╟─8fc2a4c9-fbfb-4ebd-b8ce-21bbed3b16e8
-# ╟─29d8f4da-05f1-40aa-b613-a0a4cd7ba488
-# ╟─410748b3-474b-4055-8ed4-9130a41725bf
-# ╟─8ba66bda-e4c9-4c8f-b8a8-893a1e88883c
-# ╟─fab1b8ab-b262-4b81-a512-2cd37f120a05
-# ╟─da8644ad-a3bc-41aa-a108-90096f5edbb1
-# ╟─de8d4d1d-dc8d-4a47-b51c-7a2097f8f741
+# ╟─fac54db6-e2a1-4956-8b7c-091938e74b8e
+# ╠═29b04989-caa7-4e73-a9a1-cdad9e3509d8
 # ╟─982837e3-6d4c-4012-a014-886d38d19121
 # ╟─107e9699-6baa-4978-a68f-9fc22d76d6a1
 # ╟─ac9da8e2-aee9-4c79-8e7d-f35eb7e674f2
