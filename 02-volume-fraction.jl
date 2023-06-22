@@ -84,7 +84,7 @@ md"""
 # ╔═╡ fec583af-b4a0-452d-9ac5-5b953caef70c
 md"""
 # Next Steps
-We just demonstrated how `score()` can be used with the `VolumeFraction()` algorithm (and units). This is the most well tested calcium scoring algorithm in the library, but check out the [Integrated Calcium Mass](\03-integated.jl) tutorial to see how to implement some other approaches.
+We just demonstrated how `score()` can be used with the `VolumeFraction()` algorithm (along with units from Unitful.jl). This is the most well tested calcium scoring algorithm in the library, but check out the [Integrated Calcium Mass](\03-integated.jl) tutorial to see how to implement another approach.
 """
 
 # ╔═╡ c916adfb-9336-42cc-ae6a-9b1f92e894a2
