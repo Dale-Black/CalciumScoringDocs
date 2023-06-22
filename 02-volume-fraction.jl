@@ -33,14 +33,15 @@ begin
 	end
 	
 	using PlutoUI
-	using CSV
-	using DataFrames
 	using CairoMakie
-	using ImageMorphology
-	using Statistics
-	using DICOM
-	using Unitful: mm, mg, ustrip
 	using CalciumScoring
+	
+	using CSV: read
+	using DataFrames: DataFrame
+	using ImageMorphology: dilate
+	using Statistics: mean
+	using DICOM: dcmdir_parse, @tag_str
+	using Unitful: mm, mg, ustrip
 
 	TableOfContents()
 end
@@ -48,7 +49,7 @@ end
 # ╔═╡ f5fd4bdc-1093-11ee-35c9-db1ff5709044
 md"""
 # Overview
-[Previously](01-getting-started.jl), we introduced the CalciumScoring.jl package and specificall showcased the Agatston scoring method. In this notebook we will examine how to use the Volume Fraction Calium Mass method. To understand the theory behind this technique, please see [Coronary artery calcium mass measurement based on integrated intensity and volume fraction techniques](https://doi.org/10.1101/2023.01.12.23284482)
+[Previously](01-getting-started.jl), we introduced the CalciumScoring.jl package and specifically showcased the Agatston scoring method. In this notebook we will examine how to use the Volume Fraction Calium Mass method. To understand the theory behind this technique, please see [Coronary artery calcium mass measurement based on integrated intensity and volume fraction techniques](https://doi.org/10.1101/2023.01.12.23284482)
 """
 
 # ╔═╡ d53b940a-978a-4497-a274-85cc31d6d12a
@@ -62,7 +63,7 @@ md"""
 # Volume Fraction Calcium Mass
 This calcium quantification technique does not require any intensity-based threhsolding. To calculate the calclium contained within a region of interest (ROI), the mean intensity of the background material is needed.
 
-To do this, we will dilate the dilated mask again and then subtract.
+To find the background intensity, we will first create a background ring mask by dilating the dilated mask again and then subtracting.
 """
 
 # ╔═╡ 61a0988b-6776-4620-83a5-4f274aa73952
@@ -83,8 +84,7 @@ md"""
 # ╔═╡ fec583af-b4a0-452d-9ac5-5b953caef70c
 md"""
 # Next Steps
-
-Check out the [Integrated Calcium Mass](\03-integated.jl) tutorial to see how to implement one of these approaches.
+We just demonstrated how `score()` can be used with the `VolumeFraction()` algorithm (and units). This is the most well tested calcium scoring algorithm in the library, but check out the [Integrated Calcium Mass](\03-integated.jl) tutorial to see how to implement some other approaches.
 """
 
 # ╔═╡ c916adfb-9336-42cc-ae6a-9b1f92e894a2
@@ -110,7 +110,7 @@ begin
 
 	# Calcification Masks
 	mask_large_insert_high_density = Array(
-		CSV.read(
+		read(
 			joinpath(pwd(), "dcms", "val_masks", "medium", "mask_L_LD.csv"), DataFrame;
 			header=false
 		)
@@ -141,7 +141,7 @@ begin
 		col_range = half_col-offset:half_col+offset	
 		calibration_rod[:, :, z] .= dcm_array_calibration[row_range, col_range, z];
 	end
-	hu_calcium_200, ρ_calcium_200 = mean(calibration_rod), 0.200mg/mm^3
+	hu_calcium, ρ_calcium = mean(calibration_rod), 0.200mg/mm^3
 
 
 	# Dilate mask
@@ -167,7 +167,7 @@ begin
 end
 
 # ╔═╡ 3abad7b7-37b4-415e-b3fe-34428d2b8d17
-voxel_size = voxel_spacing[1] * voxel_spacing[2] * voxel_spacing[1]
+voxel_size = voxel_spacing[1] * voxel_spacing[2] * voxel_spacing[3]
 
 # ╔═╡ a0a67d7a-183f-464e-b21a-032d32de09bb
 @bind z1 PlutoUI.Slider(axes(dcm_array, 3); default = 2, show_value = true)
@@ -200,23 +200,12 @@ end
 hu_background = mean(dcm_array[background_mask_3D])
 
 # ╔═╡ 5be9d073-e8c5-44d6-8982-639cbe8c3c6a
-volume_fraction_mass = score(dcm_array[dilated_mask_large_high_density_3D], hu_calcium_200, hu_background, voxel_size, ρ_calcium_200, VolumeFraction())
+volume_fraction_mass = score(dcm_array[dilated_mask_large_high_density_3D], hu_calcium, hu_background, voxel_size, ρ_calcium, VolumeFraction())
 
 # ╔═╡ 050f4296-e9ea-4bc7-ae28-b98f2a6c0211
 md"""
-Let's compare that with the ground truth mass
-
-We see that the ground truth mass = $(round.(mg, calcium_mass_large; digits = 3)) is close to the calculated mass = $(round.(mg, volume_fraction_mass; digits = 3))
+Let's compare that with the ground truth mass. We see that the ground truth mass = $(round.(mg, calcium_mass_large; digits = 2)) is close to the calculated mass = $(round.(mg, volume_fraction_mass; digits = 2)). This is a better estimate than the previous [Agatston scoring](01-getting-started.jl) calculation.
 """
-
-# ╔═╡ e05ae3d3-5a7d-4288-a3a1-703fadf86ef5
-function erode_recursively(mask, n)
-    eroded_mask = copy(mask)
-    for _ in 1:n
-        eroded_mask = erode(eroded_mask)
-    end
-    return eroded_mask
-end
 
 # ╔═╡ Cell order:
 # ╟─f5fd4bdc-1093-11ee-35c9-db1ff5709044
@@ -238,4 +227,3 @@ end
 # ╟─fec583af-b4a0-452d-9ac5-5b953caef70c
 # ╟─c916adfb-9336-42cc-ae6a-9b1f92e894a2
 # ╟─8b9a3224-5306-4648-b51e-5792ce9e0e55
-# ╟─e05ae3d3-5a7d-4288-a3a1-703fadf86ef5

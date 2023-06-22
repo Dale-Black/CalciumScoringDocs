@@ -32,13 +32,14 @@ begin
 	end
 	
 	using PlutoUI
-	using CSV
-	using DataFrames
 	using CairoMakie
-	using ImageMorphology
-	using Statistics
-	using DICOM
 	using CalciumScoring
+	
+	using CSV: read
+	using DataFrames: DataFrame
+	using ImageMorphology: dilate
+	using Statistics: mean
+	using DICOM: dcmdir_parse, @tag_str
 end
 
 # ╔═╡ d6254d97-3b3b-4b2f-b7b3-8bc58e6f34c2
@@ -86,7 +87,7 @@ begin
 
 	# Calcification Masks
 	mask_large_insert_high_density = Array(
-		CSV.read(
+		read(
 			joinpath(pwd(), "dcms", "val_masks", "medium", "mask_L_LD.csv"), DataFrame;
 			header=false
 		)
@@ -128,13 +129,13 @@ end
 
 # ╔═╡ 6bb10787-21f4-48fc-bec2-e7c23ccf7a8b
 md"""
-# Agatston Scoring
+# Agatston (Volume) Scoring
 """
 
 # ╔═╡ 87286995-8337-410d-bc12-a2c1c638aff5
 md"""
 ## Calculate Ground Truth Values
-The goal with calcium scoring is to quantify the amount of calcium within a cardiac CT scan. Before we calculate the calcium via various calcium scoring techniques, lets calculate the know calcium mass. Since we know the density of the calcifications and the geometry of the inserts, we can calculate the ground truth calcium mass of each of the 9 calcium inserts. 
+The goal with calcium scoring is to quantify the amount of calcium within a cardiac CT scan. Before we calculate the calcium via various calcium scoring techniques, lets calculate the known calcium mass. Since we know the density of the calcifications and the geometry of the inserts, we can calculate the ground truth calcium mass of each of the 9 calcium inserts. 
 
 The calculation for volume is simple since the inserts are cylindrical
 ```math
@@ -145,7 +146,7 @@ The calculation for volume is simple since the inserts are cylindrical
 Mass is then simple to obtain from the volume and known density
 ```math
 \text{mass} = \text{volume} \times \rho
-\tag{1}
+\tag{2}
 ```
 
 """
@@ -234,11 +235,11 @@ begin
 		col_range = half_col-offset:half_col+offset	
 		calibration_rod[:, :, z] .= dcm_array_calibration[row_range, col_range, z];
 	end
-	hu_calcium_200, ρ_calcium_200 = mean(calibration_rod), 200
+	hu_calcium, ρ_calcium = mean(calibration_rod), 0.200 # mg/mm^3
 end
 
 # ╔═╡ 2d3b75aa-da53-4490-a743-9a6ca405759f
-mass_calibration = ρ_calcium_200 / hu_calcium_200 * 1e-3
+mass_calibration = ρ_calcium / hu_calcium
 
 # ╔═╡ 52c83cf7-8d82-4c84-ba57-3384ddec26f3
 md"""
@@ -341,9 +342,7 @@ _, _, mass_score = score(pure_calcification_large_high_density, voxel_spacing, m
 
 # ╔═╡ 320405f5-4feb-4c61-98f4-ff13643490ae
 md"""
-Let's compare that with the ground truth mass
-
-We see that the ground truth mass = $(round.(calcium_mass_large, digits = 3)) is close to the calculated mass = $(round.(mass_score, digits = 3))
+Let's compare that with the ground truth mass. We see that the ground truth mass = $(round.(calcium_mass_large, digits = 2)) is close to the calculated mass = $(round.(mass_score, digits = 2))
 """
 
 # ╔═╡ 907fe9d2-a67e-4716-9c73-0ce429ae2b4f
@@ -363,17 +362,8 @@ let
 		f[1, 2],
 		title = "Pure Calcificaiton"
 	)
-	heatmap!(transpose(pure_calcification_large_high_density[:, :, z2]))
+	heatmap!(transpose(pure_calcification_large_high_density[:, :, z2]), colormap = :grays)
 	f
-end
-
-# ╔═╡ 7778b027-68be-46c7-a8f3-31413fa5554f
-function erode_recursively(mask, n)
-    eroded_mask = copy(mask)
-    for _ in 1:n
-        eroded_mask = erode(eroded_mask)
-    end
-    return eroded_mask
 end
 
 # ╔═╡ Cell order:
@@ -415,4 +405,3 @@ end
 # ╟─4a14052c-5327-43a4-bf2e-ad739bf5213d
 # ╟─140d7064-df9e-4dc8-886e-edb381792164
 # ╟─78d99536-b253-491e-b08d-df7cb97a2063
-# ╟─7778b027-68be-46c7-a8f3-31413fa5554f
